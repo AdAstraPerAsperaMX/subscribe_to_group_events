@@ -34,7 +34,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Subscribing to real-time bars for {}", contract.symbol);
 
     // Request real-time bars
-    // Note: Only 5-second bars are currently supported
+    // Note: Use RealtimeBarSize::Sec for 1-second bars
     let realtime_bars = client
         .realtime_bars(
             &contract,

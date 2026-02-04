@@ -682,12 +682,12 @@ impl Client {
         MarketDataBuilder::new(self, contract)
     }
 
-    /// Requests real time bars
-    /// Currently, only 5 seconds bars are provided.
+    /// Requests real time bars.
+    /// Supports 1-second and 5-second bars.
     ///
     /// # Arguments
     /// * `contract` - The Contract for which the depth is being requested
-    /// * `bar_size` - Currently being ignored
+    /// * `bar_size` - The realtime bar interval (1 or 5 seconds)
     /// * `what_to_show` - The nature of the data being retrieved (TRADES, MIDPOINT, BID, ASK)
     /// * `trading_hours` - Use TradingHours::Regular for data generated only during regular trading hours, or TradingHours::Extended to include data from outside regular trading hours
     ///
@@ -3618,10 +3618,7 @@ mod tests {
         let requests = gateway.requests();
         assert!(requests[0].starts_with("50\08\09000\0"), "Request should be RequestRealTimeBars");
         assert!(requests[0].contains("AAPL\0STK\0"), "Request should contain AAPL stock");
-        assert!(
-            requests[0].contains("\00\0TRADES\00\0"),
-            "Request should have bar_size=0 (5 sec) and TRADES"
-        );
+        assert!(requests[0].contains("5\0TRADES\0"), "Request should have bar_size=5 and TRADES");
     }
 
     #[tokio::test]

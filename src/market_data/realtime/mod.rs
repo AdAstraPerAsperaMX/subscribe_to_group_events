@@ -31,10 +31,11 @@ pub use crate::contracts::tick_types::TickType;
 
 /// Bar size for real-time bars.
 ///
-/// Note: Currently only 5-second bars are supported for real-time data.
+/// Note: Real-time bars support 1-second and 5-second intervals.
 #[derive(Clone, Debug, Copy, Serialize, Deserialize, PartialEq)]
 pub enum BarSize {
-    // Sec,
+    /// 1-second bars.
+    Sec,
     /// 5-second bars.
     Sec5,
     // Sec15,
@@ -47,6 +48,15 @@ pub enum BarSize {
     // Min30,
     // Hour,
     // Day,
+}
+
+impl ToField for BarSize {
+    fn to_field(&self) -> String {
+        match self {
+            Self::Sec => "1".to_string(),
+            Self::Sec5 => "5".to_string(),
+        }
+    }
 }
 
 /// Represents `BidAsk` tick by tick realtime tick.
