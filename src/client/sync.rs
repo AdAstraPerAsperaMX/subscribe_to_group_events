@@ -3758,10 +3758,7 @@ mod tests {
         // bar_size(5), what_to_show, use_rth, realtime_bars_options
         assert!(requests[0].starts_with("50\08\09000\0"), "Request should be RequestRealTimeBars");
         assert!(requests[0].contains("AAPL\0STK\0"), "Request should contain AAPL stock");
-        assert!(
-            requests[0].contains("\00\0TRADES\00\0"),
-            "Request should have bar_size=0 (5 sec) and TRADES"
-        );
+        assert!(requests[0].contains("5\0TRADES\0"), "Request should have bar_size=5 and TRADES");
     }
 
     #[test]

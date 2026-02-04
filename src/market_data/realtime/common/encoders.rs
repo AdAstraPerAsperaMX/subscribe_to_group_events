@@ -7,7 +7,7 @@ pub(crate) fn encode_request_realtime_bars(
     server_version: i32,
     ticker_id: i32,
     contract: &Contract,
-    _bar_size: &BarSize,
+    bar_size: &BarSize,
     what_to_show: &WhatToShow,
     use_rth: bool,
     options: Vec<TagValue>,
@@ -33,7 +33,7 @@ pub(crate) fn encode_request_realtime_bars(
     if server_version >= server_versions::TRADING_CLASS {
         packet.push_field(&contract.trading_class);
     }
-    packet.push_field(&0); // bar size -- not used
+    packet.push_field(bar_size);
     packet.push_field(&what_to_show.to_string());
     packet.push_field(&use_rth);
     if server_version >= server_versions::LINKING {
@@ -393,10 +393,33 @@ mod tests {
             assert_eq!(message[14], contract.trading_class, "Wrong trading class");
 
             // Verify bar parameters
-            assert_eq!(message[15], "0", "Wrong bar size");
+            assert_eq!(message[15], bar_size.to_field(), "Wrong bar size");
             assert_eq!(message[16], what_to_show.to_field(), "Wrong what to show value");
             assert_eq!(message[17], use_rth.to_field(), "Wrong use RTH flag");
             assert_eq!(message[18], "", "Wrong options field");
+        }
+
+        #[test]
+        fn test_encode_request_realtime_bars_one_second() {
+            let request_id = 9000;
+            let server_version = server_versions::TICK_BY_TICK;
+            let contract = Contract {
+                symbol: Symbol::from("GBL"),
+                security_type: SecurityType::Future,
+                exchange: Exchange::from("EUREX"),
+                currency: Currency::from("EUR"),
+                last_trade_date_or_contract_month: "202303".to_owned(),
+                ..Contract::default()
+            };
+            let bar_size = BarSize::Sec;
+            let what_to_show = WhatToShow::Trades;
+            let use_rth = true;
+            let options: Vec<TagValue> = vec![];
+
+            let message = encode_request_realtime_bars(server_version, request_id, &contract, &bar_size, &what_to_show, use_rth, options)
+                .expect("Failed to encode realtime bars request");
+
+            assert_eq!(message[15], bar_size.to_field(), "Wrong bar size");
         }
 
         #[test]
