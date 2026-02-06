@@ -31,7 +31,7 @@ pub(crate) fn decode_historical_data(server_version: i32, time_zone: &Tz, messag
 
     let mut start = OffsetDateTime::now_utc();
     let mut end = OffsetDateTime::now_utc();
-    if message_version > 2 {
+    if message_version > 2 && message_version != i32::MAX {
         start = parse_historical_data_boundary(&message.next_string()?, time_zone)?;
         end = parse_historical_data_boundary(&message.next_string()?, time_zone)?;
     }
@@ -359,9 +359,11 @@ mod tests {
 
     #[test]
     fn test_decode_historical_data() {
-        let mut message = ResponseMessage::from("17\09000\020230413  16:31:22\020230415  16:31:22\02\020230413\0182.9400\0186.5000\0180.9400\0185.9000\0948837.22\0184.869\0324891\020230414\0183.8800\0186.2800\0182.0100\0185.0000\0810998.27\0183.9865\0277547\0");
+        let mut message = ResponseMessage::from(
+            "17\03\09000\020230413  16:31:22\020230415  16:31:22\02\020230413\0182.9400\0186.5000\0180.9400\0185.9000\0948837.22\0184.869\00\0324891\020230414\0183.8800\0186.2800\0182.0100\0185.0000\0810998.27\0183.9865\00\0277547\0",
+        );
 
-        let server_version = server_versions::HISTORICAL_SCHEDULE;
+        let server_version = server_versions::SYNT_REALTIME_BARS - 1;
         let time_zone: &Tz = time_tz::timezones::db::america::NEW_YORK;
 
         let historical_data = decode_historical_data(server_version, time_zone, &mut message).expect("error decoding historical data");
@@ -395,10 +397,10 @@ mod tests {
     #[test]
     fn test_decode_historical_data_with_unix_boundaries() {
         let mut message = ResponseMessage::from(
-            "17\09000\01681417882\01681590682\01\01681417800\0182.9400\0186.5000\0180.9400\0185.9000\0948837.22\0184.869\0324891\0",
+            "17\03\09000\01681417882\01681590682\01\01681417800\0182.9400\0186.5000\0180.9400\0185.9000\0948837.22\0184.869\00\0324891\0",
         );
 
-        let server_version = server_versions::HISTORICAL_SCHEDULE;
+        let server_version = server_versions::SYNT_REALTIME_BARS - 1;
         let time_zone: &Tz = time_tz::timezones::db::america::NEW_YORK;
 
         let historical_data = decode_historical_data(server_version, time_zone, &mut message).expect("error decoding historical data");
@@ -420,6 +422,25 @@ mod tests {
             datetime!(2023-04-13 16:30:00).assume_timezone(time_zone).unwrap(),
             "historical_data.bars[0].date"
         );
+    }
+
+    #[test]
+    fn test_decode_historical_data_without_boundaries_on_new_servers() {
+        let mut message = ResponseMessage::from("17\09000\01\01681417800\0182.9400\0186.5000\0180.9400\0185.9000\0948837.22\0184.869\0324891\0");
+
+        let server_version = server_versions::HISTORICAL_SCHEDULE;
+        let time_zone: &Tz = time_tz::timezones::db::america::NEW_YORK;
+
+        let historical_data = decode_historical_data(server_version, time_zone, &mut message).expect("error decoding historical data");
+
+        assert_eq!(historical_data.bars.len(), 1, "historical_data.bars.len()");
+        assert_eq!(
+            historical_data.bars[0].date,
+            datetime!(2023-04-13 16:30:00).assume_timezone(time_zone).unwrap(),
+            "historical_data.bars[0].date"
+        );
+        assert_eq!(historical_data.bars[0].open, 182.94, "historical_data.bars[0].open");
+        assert_eq!(historical_data.bars[0].count, 324891, "historical_data.bars[0].count");
     }
 
     #[test]
