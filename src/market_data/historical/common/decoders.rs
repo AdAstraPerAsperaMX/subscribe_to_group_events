@@ -29,17 +29,11 @@ pub(crate) fn decode_historical_data(server_version: i32, time_zone: &Tz, messag
 
     message.skip(); // request_id
 
-    let slice_format = format_description!("[year][month][day]  [hour]:[minute]:[second]");
-
     let mut start = OffsetDateTime::now_utc();
     let mut end = OffsetDateTime::now_utc();
     if message_version > 2 {
-        start = PrimitiveDateTime::parse(&message.next_string()?, slice_format)?
-            .assume_timezone(time_zone)
-            .unwrap();
-        end = PrimitiveDateTime::parse(&message.next_string()?, slice_format)?
-            .assume_timezone(time_zone)
-            .unwrap();
+        start = parse_historical_data_boundary(&message.next_string()?, time_zone)?;
+        end = parse_historical_data_boundary(&message.next_string()?, time_zone)?;
     }
 
     let mut bars = Vec::new();
@@ -285,6 +279,15 @@ fn parse_schedule_date(text: &str) -> Result<Date, Error> {
     Ok(schedule_date)
 }
 
+fn parse_historical_data_boundary(text: &str, time_zone: &Tz) -> Result<OffsetDateTime, Error> {
+    let boundary_format = format_description!("[year][month][day]  [hour]:[minute]:[second]");
+    if let Ok(date_time) = PrimitiveDateTime::parse(text, boundary_format) {
+        return Ok(date_time.assume_timezone(time_zone).unwrap());
+    }
+
+    parse_unix_timestamp(text, time_zone)
+}
+
 fn parse_bar_date(text: &str, time_zone: &Tz) -> Result<OffsetDateTime, Error> {
     if text.len() == 8 {
         let date_format = format_description!("[year][month][day]");
@@ -293,10 +296,15 @@ fn parse_bar_date(text: &str, time_zone: &Tz) -> Result<OffsetDateTime, Error> {
 
         Ok(bar_date.assume_timezone_utc(time_tz::timezones::db::UTC))
     } else {
-        let timestamp: i64 = text.parse()?;
-        let date_utc = OffsetDateTime::from_unix_timestamp(timestamp).unwrap();
-        Ok(date_utc.to_timezone(time_zone))
+        parse_unix_timestamp(text, time_zone)
     }
+}
+
+fn parse_unix_timestamp(text: &str, time_zone: &Tz) -> Result<OffsetDateTime, Error> {
+    let timestamp: i64 = text.parse()?;
+    let date_utc =
+        OffsetDateTime::from_unix_timestamp(timestamp).map_err(|error| Error::Simple(format!("invalid unix timestamp '{text}': {error}")))?;
+    Ok(date_utc.to_timezone(time_zone))
 }
 
 #[cfg(test)]
@@ -382,6 +390,36 @@ mod tests {
         assert_eq!(historical_data.bars[0].volume, 948837.22, "historical_data.bars[0].volume");
         assert_eq!(historical_data.bars[0].wap, 184.869, "historical_data.bars[0].wap");
         assert_eq!(historical_data.bars[0].count, 324891, "historical_data.bars[0].count");
+    }
+
+    #[test]
+    fn test_decode_historical_data_with_unix_boundaries() {
+        let mut message = ResponseMessage::from(
+            "17\09000\01681417882\01681590682\01\01681417800\0182.9400\0186.5000\0180.9400\0185.9000\0948837.22\0184.869\0324891\0",
+        );
+
+        let server_version = server_versions::HISTORICAL_SCHEDULE;
+        let time_zone: &Tz = time_tz::timezones::db::america::NEW_YORK;
+
+        let historical_data = decode_historical_data(server_version, time_zone, &mut message).expect("error decoding historical data");
+
+        assert_eq!(
+            historical_data.start,
+            datetime!(2023-04-13 16:31:22).assume_timezone(time_zone).unwrap(),
+            "historical_data.start"
+        );
+        assert_eq!(
+            historical_data.end,
+            datetime!(2023-04-15 16:31:22).assume_timezone(time_zone).unwrap(),
+            "historical_data.end"
+        );
+
+        assert_eq!(historical_data.bars.len(), 1, "historical_data.bars.len()");
+        assert_eq!(
+            historical_data.bars[0].date,
+            datetime!(2023-04-13 16:30:00).assume_timezone(time_zone).unwrap(),
+            "historical_data.bars[0].date"
+        );
     }
 
     #[test]
